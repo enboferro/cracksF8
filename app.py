@@ -1,133 +1,150 @@
 import streamlit as st
 import time
 
-# Configuración de pantalla para Tablet 8 pulgadas
-st.set_page_config(page_title="LUD F8 Control", layout="wide")
+# Configuración de página
+st.set_page_config(page_title="LUD F8 - Pixel Edition", layout="wide")
 
+# CSS Avanzado para Responsive (Pixel 10 Pro XL y Tablets)
 st.markdown("""
     <style>
-    /* Estilo para botones táctiles grandes */
-    .stButton > button {
-        width: 100%;
-        height: 70px !important;
-        font-size: 18px !important;
-        font-weight: bold !important;
-        border-radius: 12px;
-        border: 2px solid #4B2E2A;
+    /* Contenedor principal */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 0rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
+    
+    /* Cronómetro adaptable */
     .main-clock {
-        font-size: 100px !important;
-        font-family: 'monospace';
-        font-weight: bold;
+        font-size: calc(40px + 4vw) !important;
+        font-family: 'Courier New', Courier, monospace;
+        font-weight: 800;
         text-align: center;
-        color: #4B2E2A;
-        padding: 0px;
-        margin-top: -20px;
+        color: #1d1d1d;
+        line-height: 1;
+        margin: 10px 0;
     }
+
+    /* Marcador */
     .score-box {
-        font-size: 60px;
+        font-size: calc(30px + 3vw);
         font-weight: 900;
         text-align: center;
-        line-height: 1;
     }
-    .player-on {
-        background-color: #00FF41 !important;
-        color: black !important;
+
+    /* Botones de acción (Goles/Faltas) */
+    .stButton > button {
+        width: 100%;
+        border-radius: 10px;
+        font-weight: bold !important;
+        text-transform: uppercase;
     }
+
+    /* Botones de Jugadores - Altura ajustable para no hacer scroll */
+    div[data-testid="stVerticalBlock"] > div:has(button[key^="btn_"]) {
+        margin-bottom: -10px;
+    }
+    
+    .player-btn > div > button {
+        height: 55px !important;
+        font-size: 14px !important;
+    }
+    
+    /* Quitar espacios innecesarios de Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- INICIALIZACIÓN DEL ESTADO ---
+# --- ESTADO ---
 if 'running' not in st.session_state:
     st.session_state.update({
-        'running': False,
-        'tiempo_acumulado': 0,
-        'ultimo_click': None,
-        'goles_lud': 0,
-        'goles_riv': 0,
-        'faltas_lud': 0,
-        'faltas_riv': 0,
-        'pista': []
+        'running': False, 'tiempo_acumulado': 0, 'ultimo_click': None,
+        'goles_lud': 0, 'goles_riv': 0, 'faltas_lud': 0, 'faltas_riv': 0, 'pista': []
     })
 
 s = st.session_state
 
-# --- LÓGICA DEL TIEMPO (ASCENDENTE) ---
+# Lógica de tiempo
 if s.running:
     tiempo_actual = s.tiempo_acumulado + (time.time() - s.ultimo_click)
 else:
     tiempo_actual = s.tiempo_acumulado
 
 mins, secs = divmod(int(tiempo_actual), 60)
-formato_tiempo = f"{mins:02d}:{secs:02d}"
 
-# --- CABECERA: MARCADOR Y CRONO ---
-col_lud, col_time, col_riv = st.columns([1, 2, 1])
+# --- INTERFAZ DINÁMICA ---
 
-with col_lud:
+# Fila 1: Marcador y Tiempo
+col1, col2, col3 = st.columns([1, 2, 1])
+
+with col1:
     st.markdown(f"<div class='score-box'>{s.goles_lud}</div>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; font-weight:bold;'>LEVANTE UD</p>", unsafe_allow_html=True)
-    if st.button("⚽ + GOL"): s.goles_lud += 1; st.rerun()
+    if st.button("⚽ LUD"): 
+        s.goles_lud += 1
+        st.rerun()
 
-with col_time:
-    st.markdown(f"<div class='main-clock'>{formato_tiempo}</div>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1,1,1])
-    if c1.button("▶️"):
+with col2:
+    st.markdown(f"<div class='main-clock'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
+    c_start, c_stop, c_reset = st.columns(3)
+    if c_start.button("▶️"):
         if not s.running:
             s.running = True
             s.ultimo_click = time.time()
             st.rerun()
-    if c2.button("⏸️"):
+    if c_stop.button("⏸️"):
         if s.running:
             s.tiempo_acumulado += (time.time() - s.ultimo_click)
             s.running = False
             st.rerun()
-    if c3.button("🔄"):
+    if c_reset.button("🔄"):
         s.tiempo_acumulado = 0
         s.running = False
         st.rerun()
 
-with col_riv:
+with col3:
     st.markdown(f"<div class='score-box'>{s.goles_riv}</div>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; font-weight:bold;'>RIVAL</p>", unsafe_allow_html=True)
-    if st.button("⚽ + RIV"): s.goles_riv += 1; st.rerun()
+    if st.button("⚽ RIV"): 
+        s.goles_riv += 1
+        st.rerun()
 
-st.divider()
+# Fila 2: Faltas
+st.write("")
+f_l, f_r = st.columns(2)
+if f_l.button(f"Faltas LUD: {s.faltas_lud}"): 
+    s.faltas_lud += 1
+    st.rerun()
+if f_r.button(f"Faltas RIVAL: {s.faltas_riv}"): 
+    s.faltas_riv += 1
+    st.rerun()
 
-# --- SECCIÓN DE FALTAS ---
-f1, f2 = st.columns(2)
-with f1:
-    if st.button(f"FALTAS LUD: {s.faltas_lud}"): s.faltas_lud += 1; st.rerun()
-with f2:
-    if st.button(f"FALTAS RIVAL: {s.faltas_riv}"): s.faltas_riv += 1; st.rerun()
+st.markdown("---")
 
-# --- GESTIÓN DE PLANTILLA F8 (7+1) ---
-st.subheader(f"👥 Plantilla en Pista ({len([j for j in s.pista if j not in ['Serra', 'Jose']])} / 7 jugadores de campo)")
-
+# Fila 3: Jugadores (Grid adaptable)
+# En móviles modernos, 2 o 3 columnas es lo ideal para no fallar el dedo
+st.markdown(f"**Pista (F8): {len([j for j in s.pista if j not in ['Serra', 'Jose']])}/7**")
 jugadores = ["Serra", "Julian", "Omar", "Tony", "Rochina", "Benages", "Pedrito", "Parre", "Baeza", "Manu", "Toro", "Silla", "Jose", "Coque", "Nacho"]
-cols = st.columns(3) # 3 columnas para que los botones sean muy anchos en 8"
+
+# Usamos 3 columnas para el Pixel 10 Pro XL (pantalla ancha)
+cols = st.columns(3)
 
 for i, nombre in enumerate(jugadores):
     with cols[i % 3]:
         en_pista = nombre in s.pista
-        # Marcamos visualmente si está en pista
-        label = f"✅ {nombre}" if en_pista else f"🪑 {nombre}"
-        
-        if st.button(label, key=f"btn_{nombre}"):
+        tipo = "✅" if en_pista else "⬜"
+        # Usamos contenedores para aplicar estilo específico a estos botones
+        if st.button(f"{tipo} {nombre}", key=f"btn_{nombre}"):
             if en_pista:
                 s.pista.remove(nombre)
             else:
                 porteros = ["Serra", "Jose"]
-                jugadores_campo = [j for j in s.pista if j not in porteros]
-                
-                # REGLA F8: Portero + 7 de campo
-                if nombre in porteros or len(jugadores_campo) < 7:
+                if nombre in porteros or len([j for j in s.pista if j not in porteros]) < 7:
                     s.pista.append(nombre)
-                else:
-                    st.warning("¡Ya hay 7 jugadores de campo!")
             st.rerun()
 
-# Refresco para que el cronómetro se vea fluido
+# Auto-refresh
 if s.running:
-    time.sleep(1)
+    time.sleep(0.5)
     st.rerun()

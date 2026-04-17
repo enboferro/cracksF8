@@ -1,150 +1,119 @@
 import streamlit as st
 import time
 
-# Configuración de página
-st.set_page_config(page_title="LUD F8 - Pixel Edition", layout="wide")
+# Configuración para móvil (Pixel 10 Pro XL)
+st.set_page_config(page_title="LUD F8 PRO", layout="wide")
 
-# CSS Avanzado para Responsive (Pixel 10 Pro XL y Tablets)
+# CSS para que parezca una App Nativa
 st.markdown("""
     <style>
-    /* Contenedor principal */
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 0rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
+    .block-container { padding: 1rem 0.5rem; }
+    .main-clock { font-size: 50px !important; font-weight: 800; text-align: center; color: #1d1d1d; margin: 0; }
+    .stat-text { font-size: 12px; color: #666; text-align: center; }
+    .player-card { 
+        border: 1px solid #ddd; border-radius: 8px; padding: 5px; margin-bottom: 5px;
+        background-color: #f9f9f9;
     }
-    
-    /* Cronómetro adaptable */
-    .main-clock {
-        font-size: calc(40px + 4vw) !important;
-        font-family: 'Courier New', Courier, monospace;
-        font-weight: 800;
-        text-align: center;
-        color: #1d1d1d;
-        line-height: 1;
-        margin: 10px 0;
-    }
-
-    /* Marcador */
-    .score-box {
-        font-size: calc(30px + 3vw);
-        font-weight: 900;
-        text-align: center;
-    }
-
-    /* Botones de acción (Goles/Faltas) */
-    .stButton > button {
-        width: 100%;
-        border-radius: 10px;
-        font-weight: bold !important;
-        text-transform: uppercase;
-    }
-
-    /* Botones de Jugadores - Altura ajustable para no hacer scroll */
-    div[data-testid="stVerticalBlock"] > div:has(button[key^="btn_"]) {
-        margin-bottom: -10px;
-    }
-    
-    .player-btn > div > button {
-        height: 55px !important;
-        font-size: 14px !important;
-    }
-    
-    /* Quitar espacios innecesarios de Streamlit */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    .stButton > button { width: 100%; height: 50px !important; border-radius: 8px; font-size: 14px !important; }
+    /* Estilo para jugadores en pista */
+    div.stButton > button[kind="primary"] { background-color: #28a745 !important; color: white !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- ESTADO ---
-if 'running' not in st.session_state:
+# --- INICIALIZACIÓN DE VARIABLES ---
+if 'players_stats' not in st.session_state:
+    jugadores = ["Serra", "Julian", "Omar", "Tony", "Rochina", "Benages", "Pedrito", "Parre", "Baeza", "Manu", "Toro", "Silla", "Jose", "Coque", "Nacho"]
+    st.session_state.players_stats = {
+        nom: {'total': 0, 'current_shift': 0, 'last_entry': None, 'in_pista': False} 
+        for nom in jugadores
+    }
     st.session_state.update({
         'running': False, 'tiempo_acumulado': 0, 'ultimo_click': None,
-        'goles_lud': 0, 'goles_riv': 0, 'faltas_lud': 0, 'faltas_riv': 0, 'pista': []
+        'goles_lud': 0, 'goles_riv': 0
     })
 
 s = st.session_state
 
-# Lógica de tiempo
+# --- LÓGICA DEL CRONÓMETRO GENERAL ---
 if s.running:
-    tiempo_actual = s.tiempo_acumulado + (time.time() - s.ultimo_click)
+    ahora = time.time()
+    diff = ahora - s.ultimo_click
+    tiempo_actual = s.tiempo_acumulado + diff
+    # Actualizar tiempos de jugadores en pista
+    for p, stats in s.players_stats.items():
+        if stats['in_pista']:
+            stats['current_shift'] = ahora - stats['last_entry']
 else:
     tiempo_actual = s.tiempo_acumulado
 
 mins, secs = divmod(int(tiempo_actual), 60)
 
-# --- INTERFAZ DINÁMICA ---
-
-# Fila 1: Marcador y Tiempo
-col1, col2, col3 = st.columns([1, 2, 1])
-
+# --- CABECERA (MARCADOR Y CONTROL) ---
+col1, col2, col3 = st.columns([1, 1.5, 1])
 with col1:
-    st.markdown(f"<div class='score-box'>{s.goles_lud}</div>", unsafe_allow_html=True)
-    if st.button("⚽ LUD"): 
-        s.goles_lud += 1
-        st.rerun()
+    st.markdown(f"<h2 style='text-align:center;'>{s.goles_lud}</h2>", unsafe_allow_html=True)
+    if st.button("⚽ LUD"): s.goles_lud += 1; st.rerun()
 
 with col2:
     st.markdown(f"<div class='main-clock'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
-    c_start, c_stop, c_reset = st.columns(3)
-    if c_start.button("▶️"):
-        if not s.running:
+    c1, c2 = st.columns(2)
+    if not s.running:
+        if c1.button("▶️"):
             s.running = True
             s.ultimo_click = time.time()
+            for p in s.players_stats.values():
+                if p['in_pista']: p['last_entry'] = s.ultimo_click
             st.rerun()
-    if c_stop.button("⏸️"):
-        if s.running:
-            s.tiempo_acumulado += (time.time() - s.ultimo_click)
+    else:
+        if c1.button("⏸️"):
             s.running = False
+            s.tiempo_acumulado += (time.time() - s.ultimo_click)
+            for p in s.players_stats.values():
+                if p['in_pista']:
+                    p['total'] += p['current_shift']
+                    p['current_shift'] = 0
             st.rerun()
-    if c_reset.button("🔄"):
-        s.tiempo_acumulado = 0
-        s.running = False
-        st.rerun()
+    if c2.button("🔄"): st.session_state.clear(); st.rerun()
 
 with col3:
-    st.markdown(f"<div class='score-box'>{s.goles_riv}</div>", unsafe_allow_html=True)
-    if st.button("⚽ RIV"): 
-        s.goles_riv += 1
-        st.rerun()
+    st.markdown(f"<h2 style='text-align:center;'>{s.goles_riv}</h2>", unsafe_allow_html=True)
+    if st.button("⚽ RIV"): s.goles_riv += 1; st.rerun()
 
-# Fila 2: Faltas
-st.write("")
-f_l, f_r = st.columns(2)
-if f_l.button(f"Faltas LUD: {s.faltas_lud}"): 
-    s.faltas_lud += 1
-    st.rerun()
-if f_r.button(f"Faltas RIVAL: {s.faltas_riv}"): 
-    s.faltas_riv += 1
-    st.rerun()
+st.divider()
 
-st.markdown("---")
+# --- LISTA DE JUGADORES (OPTIMIZADA MÓVIL) ---
+st.markdown("### 🏃 Jugadores (Pista / Total)")
 
-# Fila 3: Jugadores (Grid adaptable)
-# En móviles modernos, 2 o 3 columnas es lo ideal para no fallar el dedo
-st.markdown(f"**Pista (F8): {len([j for j in s.pista if j not in ['Serra', 'Jose']])}/7**")
-jugadores = ["Serra", "Julian", "Omar", "Tony", "Rochina", "Benages", "Pedrito", "Parre", "Baeza", "Manu", "Toro", "Silla", "Jose", "Coque", "Nacho"]
-
-# Usamos 3 columnas para el Pixel 10 Pro XL (pantalla ancha)
-cols = st.columns(3)
-
-for i, nombre in enumerate(jugadores):
-    with cols[i % 3]:
-        en_pista = nombre in s.pista
-        tipo = "✅" if en_pista else "⬜"
-        # Usamos contenedores para aplicar estilo específico a estos botones
-        if st.button(f"{tipo} {nombre}", key=f"btn_{nombre}"):
-            if en_pista:
-                s.pista.remove(nombre)
-            else:
+for nom, stats in s.players_stats.items():
+    col_btn, col_info = st.columns([2, 1])
+    
+    with col_btn:
+        # El botón cambia a color verde si está en pista
+        btn_type = "primary" if stats['in_pista'] else "secondary"
+        if st.button(f"{nom}", key=f"btn_{nom}", type=btn_type):
+            if not stats['in_pista']:
+                # ENTRAR A PISTA
                 porteros = ["Serra", "Jose"]
-                if nombre in porteros or len([j for j in s.pista if j not in porteros]) < 7:
-                    s.pista.append(nombre)
+                en_pista_campo = [p for p, stt in s.players_stats.items() if stt['in_pista'] and p not in porteros]
+                
+                if nom in porteros or len(en_pista_campo) < 7:
+                    stats['in_pista'] = True
+                    stats['last_entry'] = time.time() if s.running else None
+            else:
+                # SALIR A BANQUILLO
+                stats['in_pista'] = False
+                if s.running and stats['last_entry']:
+                    stats['total'] += (time.time() - stats['last_entry'])
+                stats['current_shift'] = 0
             st.rerun()
+
+    with col_info:
+        m_t, s_t = divmod(int(stats['total'] + (stats['current_shift'] if s.running else 0)), 60)
+        m_c, s_c = divmod(int(stats['current_shift']), 60)
+        st.markdown(f"**{m_t:02d}:{s_t:02d}**")
+        st.markdown(f"<div class='stat-text'>Shift: {m_c:02d}:{s_c:02d}</div>", unsafe_allow_html=True)
 
 # Auto-refresh
 if s.running:
-    time.sleep(0.5)
+    time.sleep(1)
     st.rerun()

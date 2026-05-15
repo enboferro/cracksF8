@@ -1,133 +1,139 @@
 import streamlit as st
-import time
+import pandas as pd
+from datetime import datetime
 
-# Configuración para aprovechar cada píxel del Pixel 10 Pro XL
-st.set_page_config(page_title="LUD F8 PRO - Compact", layout="wide")
+# 1. Configuración de la página
+st.set_page_config(page_title="Estadísticas de Partido PRO", layout="wide")
+st.title("📊 Registrador de Estadísticas Avanzado")
 
-st.markdown("""
-    <style>
-    /* Eliminar márgenes de Streamlit para ganar pantalla */
-    .block-container { padding: 0.5rem; }
+# 2. Inicializar el estado de la sesión
+if "historial" not in st.session_state:
+    # Creamos un DataFrame vacío para guardar cada evento del partido
+    st.session_state.historial = pd.DataFrame(columns=["Hora", "Jugador", "Acción", "Resultado"])
+
+if "inicio_partido" not in st.session_state:
+    st.session_state.inicio_partido = None
+
+# 3. Panel Lateral: Configuración del Partido
+with st.sidebar:
+    st.header("⚙️ Configuración")
     
-    /* Cronómetro y Marcador ultra-compacto */
-    .main-clock { font-size: 45px !important; font-weight: 800; text-align: center; line-height: 1; margin: 0; }
-    .score-val { font-size: 40px; font-weight: 900; text-align: center; }
+    # Gestión de jugadores
+    jugadores_input = st.text_area("Lista de jugadores (separados por coma):", 
+                                   "Juan, Pedro, Carlos, Sofía, Luis")
+    lista_jugadores = [j.strip() for j in jugadores_input.split(",") if j.strip()]
     
-    /* Grid de jugadores */
-    .player-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        padding: 2px;
-        background-color: #f1f1f1;
-    }
+    st.markdown("---")
     
-    /* Botones de jugador ajustados para 3 columnas */
-    div.stButton > button {
-        width: 100%;
-        height: 65px !important;
-        padding: 0px !important;
-        border-radius: 8px;
-        line-height: 1.2;
-    }
-    
-    /* Texto de tiempos dentro del botón o muy cerca */
-    .time-overlay {
-        font-size: 10px !important;
-        font-family: monospace;
-        line-height: 1;
-        margin-top: -15px;
-        pointer-events: none;
-    }
-    
-    /* Quitar padding entre columnas */
-    [data-testid="column"] { padding: 0 2px !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- ESTADO ---
-if 'players_stats' not in st.session_state:
-    jugadores = ["Serra", "Julian", "Omar", "Tony", "Rochina", "Benages", "Pedrito", "Parre", "Baeza", "Manu", "Toro", "Silla", "Jose", "Coque", "Nacho"]
-    st.session_state.players_stats = {
-        nom: {'total': 0, 'current_shift': 0, 'last_entry': None, 'in_pista': False} 
-        for nom in jugadores
-    }
-    st.session_state.update({'running': False, 'tiempo_acumulado': 0, 'ultimo_click': None, 'goles_lud': 0, 'goles_riv': 0})
-
-s = st.session_state
-
-# --- LÓGICA CRONO ---
-if s.running:
-    ahora = time.time()
-    tiempo_actual = s.tiempo_acumulado + (ahora - s.ultimo_click)
-    for p, stats in s.players_stats.items():
-        if stats['in_pista']:
-            stats['current_shift'] = ahora - stats['last_entry']
-else:
-    tiempo_actual = s.tiempo_acumulado
-
-mins, secs = divmod(int(tiempo_actual), 60)
-
-# --- CABECERA (3 COLUMNAS) ---
-c_lud, c_mid, c_riv = st.columns([1, 1.5, 1])
-with c_lud:
-    st.markdown(f"<div class='score-val'>{s.goles_lud}</div>", unsafe_allow_html=True)
-    if st.button("⚽ LUD"): s.goles_lud += 1; st.rerun()
-
-with c_mid:
-    st.markdown(f"<div class='main-clock'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
-    b1, b2, b3 = st.columns(3)
-    if b1.button("▶️" if not s.running else "⏸️"):
-        if not s.running:
-            s.running = True; s.ultimo_click = time.time()
-            for p in s.players_stats.values():
-                if p['in_pista']: p['last_entry'] = s.ultimo_click
-        else:
-            s.running = False; s.tiempo_acumulado += (time.time() - s.ultimo_click)
-            for p in s.players_stats.values():
-                if p['in_pista']: p['total'] += p['current_shift']; p['current_shift'] = 0
-        st.rerun()
-    if b2.button("🔄"): st.session_state.clear(); st.rerun()
-    # Botón para descargar el resumen si es necesario
-    if b3.button("📥"): st.toast("Datos guardados")
-
-with c_riv:
-    st.markdown(f"<div class='score-val'>{s.goles_riv}</div>", unsafe_allow_html=True)
-    if st.button("⚽ RIV"): s.goles_riv += 1; st.rerun()
-
-st.write("") # Espaciador mínimo
-
-# --- GRID DE JUGADORES (3 COLUMNAS) ---
-# Calculamos cuántos hay de campo
-p_campo = [p for p, stt in s.players_stats.items() if stt['in_pista'] and p not in ["Serra", "Jose"]]
-st.markdown(f"<p style='text-align:center; margin:0;'><b>Pista: {len(p_campo)}/7</b></p>", unsafe_allow_html=True)
-
-cols = st.columns(3)
-for i, (nom, stats) in enumerate(s.players_stats.items()):
-    with cols[i % 3]:
-        # Formateo de tiempos
-        t_total = stats['total'] + (stats['current_shift'] if s.running and stats['in_pista'] else 0)
-        m_t, s_t = divmod(int(t_total), 60)
-        m_c, s_c = divmod(int(stats['current_shift']), 60)
+    # Control del tiempo del partido
+    if st.session_state.inicio_partido is None:
+        if st.button("▶️ Iniciar Partido / Cronómetro", type="primary", use_container_width=True):
+            st.session_state.inicio_partido = datetime.now()
+            st.rerun()
+    else:
+        tiempo_transcurrido = datetime.now() - st.session_state.inicio_partido
+        minutos = int(tiempo_transcurrido.total_seconds() // 60)
+        st.success(st.session_state.inicio_partido.strftime("Partido iniciado a las %H:%M"))
         
-        # El nombre y los tiempos van en el mismo bloque visual
-        btn_label = f"{nom}\n{m_t:02d}:{s_t:02d} | {m_c:02d}:{s_c:02d}"
-        
-        if st.button(btn_label, key=f"btn_{nom}", type="primary" if stats['in_pista'] else "secondary"):
-            if not stats['in_pista']:
-                if nom in ["Serra", "Jose"] or len(p_campo) < 7:
-                    stats['in_pista'] = True
-                    stats['last_entry'] = time.time() if s.running else None
-            else:
-                stats['in_pista'] = False
-                if s.running and stats['last_entry']:
-                    stats['total'] += (time.time() - stats['last_entry'])
-                stats['current_shift'] = 0
+        if st.button("🔄 Reiniciar Todo", type="secondary", use_container_width=True):
+            st.session_state.historial = pd.DataFrame(columns=["Hora", "Jugador", "Acción", "Resultado"])
+            st.session_state.inicio_partido = None
             st.rerun()
 
-if s.running:
-    time.sleep(1)
-    st.rerun()
+# Función para registrar un evento
+def registrar_evento(jugador, accion, resultado):
+    if st.session_state.inicio_partido is None:
+        st.error("❌ ¡Primero debes iniciar el partido en el panel lateral!")
+        return
+
+    # Calcular el minuto del partido
+    tiempo_transcurrido = datetime.now() - st.session_state.inicio_partido
+    minuto_partido = f"Min {int(tiempo_transcurrido.total_seconds() // 60)}'"
+    
+    # Añadir nueva fila al historial
+    nueva_fila = pd.DataFrame([{
+        "Hora": minuto_partido,
+        "Jugador": jugador,
+        "Acción": accion,
+        "Resultado": resultado
+    }])
+    
+    st.session_state.historial = pd.concat([st.session_state.historial, nueva_fila], ignore_index=True)
+
+# --- CUERPO PRINCIPAL ---
+
+if st.session_state.inicio_partido is None:
+    st.warning("👈 Por favor, inicia el partido en el panel izquierdo para empezar a registrar.")
+else:
+    # 4. Selección de Jugador Activo
+    st.subheader("🏃‍♂️ Selección de Jugador")
+    jugador_activo = st.selectbox("¿Quién realiza la acción?", lista_jugadores)
+
+    # 5. Botones de Registro
+    st.subheader("⚽ Botonera de Eventos")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### **Pases**")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅ Pase Bueno", key="pb", use_container_width=True):
+                registrar_evento(jugador_activo, "Pase", "Bueno")
+        with c2:
+            if st.button("❌ Pase Malo", key="pm", use_container_width=True):
+                registrar_evento(jugador_activo, "Pase", "Malo")
+
+    with col2:
+        st.markdown("### **Tiros**")
+        c3, c4 = st.columns(2)
+        with c3:
+            if st.button("🎯 Tiro Bueno", key="tb", use_container_width=True):
+                registrar_evento(jugador_activo, "Tiro", "Bueno")
+        with c4:
+            if st.button("🪵 Tiro Malo", key="tm", use_container_width=True):
+                registrar_evento(jugador_activo, "Tiro", "Malo")
+
+    st.markdown("---")
+
+    # 6. Visualización de Estadísticas y Filtros
+    st.subheader("📈 Panel de Estadísticas")
+    
+    # Filtro para ver estadísticas globales o por jugador específico
+    opciones_filtro = ["Todos los Jugadores"] + lista_jugadores
+    filtro_ver = st.selectbox("Ver estadísticas de:", opciones_filtro)
+    
+    # Filtrar el DataFrame según la selección
+    df_filtrado = st.session_state.historial
+    if filtro_ver != "Todos los Jugadores":
+        df_filtrado = df_filtrado[df_filtrado["Jugador"] == filtro_ver]
+
+    # Cálculos dinámicos
+    pases_b = len(df_filtrado[(df_filtrado["Acción"] == "Pase") & (df_filtrado["Resultado"] == "Bueno")])
+    pases_m = len(df_filtrado[(df_filtrado["Acción"] == "Pase") & (df_filtrado["Resultado"] == "Malo")])
+    tiros_b = len(df_filtrado[(df_filtrado["Acción"] == "Tiro") & (df_filtrado["Resultado"] == "Bueno")])
+    tiros_m = len(df_filtrado[(df_filtrado["Acción"] == "Tiro") & (df_filtrado["Resultado"] == "Malo")])
+    
+    tot_pases = pases_b + pases_m
+    tot_tiros = tiros_b + tiros_m
+    
+    pct_pases = (pases_b / tot_pases * 100) if tot_pases > 0 else 0
+    pct_tiros = (tiros_b / tot_tiros * 100) if tot_tiros > 0 else 0
+
+    # Mostrar métricas del filtro seleccionado
+    m1, m2 = st.columns(2)
+    with m1:
+        st.metric(label=f"Efectividad Pases ({filtro_ver})", value=f"{pct_pases:.1f}%", delta=f"{tot_pases} intentos")
+        st.caption(f"Buenos: {pases_b} | Malos: {pases_m}")
+    with m2:
+        st.metric(label=f"Efectividad Tiros ({filtro_ver})", value=f"{pct_tiros:.1f}%", delta=f"{tot_tiros} intentos")
+        st.caption(f"Buenos: {tiros_b} | Malos: {tiros_m}")
+
+    st.markdown("---")
+
+    # 7. Historial del Tiempo (Línea de sucesos)
+    st.subheader("⏱️ Historial del Partido (Últimas acciones primero)")
+    if not st.session_state.historial.empty:
+        # Mostramos el historial ordenado a la inversa para ver lo más reciente arriba
+        st.dataframe(st.session_state.historial.iloc[::-1], use_container_width=True)
+    else:
+        st.info("Aún no hay acciones registradas en este partido.")
